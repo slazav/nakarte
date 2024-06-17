@@ -429,6 +429,15 @@ L.Control.TrackList = L.Control.extend({
             }
         },
 
+        onTrackWeightChanged: function(track) {
+            var weight = track.weight();
+            this.getTrackPolylines(track).forEach(
+                function(polyline) {
+                    polyline.setStyle({weight: weight});
+                }
+            );
+        },
+
         onTrackVisibilityChanged: function(track) {
             if (track.visible()) {
                 this.map.addLayer(track.feature);
@@ -864,6 +873,7 @@ L.Control.TrackList = L.Control.extend({
         addTrackSegment: function(track, sourcePoints) {
             var polyline = new TrackSegment(sourcePoints || [], {
                     color: track.html_color(),
+                    weight: track.weight(),
                     print: true
                 }
             );
@@ -1188,7 +1198,8 @@ L.Control.TrackList = L.Control.extend({
         },
 
         addTrack: function(geodata) {
-            var color;
+            var color, weight;
+            weight = geodata.weight || 6;
             color = geodata.color;
             if (!color) {
                 color = this.colors[this._lastTrackColor];
@@ -1197,6 +1208,7 @@ L.Control.TrackList = L.Control.extend({
             var track = {
                 name: ko.observable(geodata.name),
                 color: ko.observable(color),
+                weight: ko.observable(weight),
                 visible: ko.observable(!geodata.trackHidden),
                 length: ko.observable(0),
                 measureTicksShown: ko.observable(geodata.measureTicksShown || false),
@@ -1216,12 +1228,14 @@ L.Control.TrackList = L.Control.extend({
             track.visible.subscribe(this.onTrackVisibilityChanged.bind(this, track));
             track.measureTicksShown.subscribe(this.setTrackMeasureTicksVisibility.bind(this, track));
             track.color.subscribe(this.onTrackColorChanged.bind(this, track));
+            track.weight.subscribe(this.onTrackWeightChanged.bind(this, track));
             if (!L.Browser.touch) {
                 track.feature.bindTooltip(() => track.name(), {sticky: true, delay: 500});
             }
             track.hover.subscribe(this.onTrackHoverChanged.bind(this, track));
 
             // this.onTrackColorChanged(track);
+            this.onTrackWeightChanged(track);
             this.onTrackVisibilityChanged(track);
             this.attachColorSelector(track);
             this.attachActionsMenu(track);
@@ -1444,6 +1458,7 @@ L.Control.TrackList = L.Control.extend({
                         ];
                         return {
                             color: track.color(),
+                            weight: track.weight(),
                             visible: track.visible(),
                             segments: capturedTrack,
                             bounds: capturedBounds,
