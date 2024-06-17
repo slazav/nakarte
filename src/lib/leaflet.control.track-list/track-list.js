@@ -27,7 +27,7 @@ import {wrapLatLngToTarget, wrapLatLngBoundsToTarget} from '~/lib/leaflet.fixes/
 import {splitLinesAt180Meridian} from "./lib/meridian180";
 import {ElevationProvider} from '~/lib/elevations';
 
-const TRACKLIST_TRACK_COLORS = ['#77f', '#f95', '#0ff', '#f77', '#f7f', '#ee5'];
+const TRACKLIST_TRACK_COLORS = [0x7777ff, 0xff9955, 0x00ffff, 0xff7777, 0xff77ff, 0xeeee55];
 
 const TrackSegment = L.MeasuredLine.extend({
     includes: L.Polyline.EditMixin,
@@ -178,7 +178,7 @@ L.Control.TrackList = L.Control.extend({
                                    },
                                    css: {hover: hover() && $parent.tracks().length > 1, edit: isEdited() && $parent.tracks().length > 1}">
                         <td><input type="checkbox" class="visibility-switch" data-bind="checked: track.visible"></td>
-                        <td><div class="color-sample" data-bind="style: {backgroundColor: $parent.colors[track.color()]}, click: $parent.onColorSelectorClicked.bind($parent)"></div></td>
+                        <td><div class="color-sample" data-bind="style: {backgroundColor: track.html_color()}, click: $parent.onColorSelectorClicked.bind($parent)"></div></td>
                         <td><div class="track-name-wrapper"><div class="track-name" data-bind="text: track.name, attr: {title: track.name}, click: $parent.setViewToTrack.bind($parent)"></div></div></td>
                         <td>
                             <div class="button-length" title="Show distance marks" data-bind="
@@ -416,7 +416,7 @@ L.Control.TrackList = L.Control.extend({
         },
 
         onTrackColorChanged: function(track) {
-            var color = this.colors[track.color()];
+            var color = track.html_color();
             this.getTrackPolylines(track).forEach(
                 function(polyline) {
                     polyline.setStyle({color: color});
@@ -526,11 +526,11 @@ L.Control.TrackList = L.Control.extend({
         },
 
         attachColorSelector: function(track) {
-            var items = this.colors.map(function(color, index) {
+            var items = this.colors.map(function(color, _unused_index) {
                     return {
                         text: '<div style="display: inline-block; vertical-align: middle; width: 50px; height: 0; ' +
-                            'border-top: 4px solid ' + color + '"></div>',
-                        callback: track.color.bind(null, index)
+                            'border-top: 4px solid #' + color.toString(16).padStart(6, '0') + '"></div>',
+                        callback: track.color.bind(null, color)
                     };
                 }
             );
@@ -863,7 +863,7 @@ L.Control.TrackList = L.Control.extend({
 
         addTrackSegment: function(track, sourcePoints) {
             var polyline = new TrackSegment(sourcePoints || [], {
-                    color: this.colors[track.color()],
+                    color: track.html_color(),
                     print: true
                 }
             );
@@ -1190,8 +1190,8 @@ L.Control.TrackList = L.Control.extend({
         addTrack: function(geodata) {
             var color;
             color = geodata.color;
-            if (!(color >= 0 && color < this.colors.length)) {
-                color = this._lastTrackColor;
+            if (!color) {
+                color = this.colors[this._lastTrackColor];
                 this._lastTrackColor = (this._lastTrackColor + 1) % this.colors.length;
             }
             var track = {
@@ -1203,7 +1203,10 @@ L.Control.TrackList = L.Control.extend({
                 feature: L.featureGroup([]),
                 markers: [],
                 hover: ko.observable(false),
-                isEdited: ko.observable(false)
+                isEdited: ko.observable(false),
+                html_color: function() {
+                    return '#' + this.color().toString(16).padStart(6, '0');
+                }
             };
             (geodata.tracks || []).forEach(this.addTrackSegment.bind(this, track));
             (geodata.points || []).forEach(this.addPoint.bind(this, track));
@@ -1271,10 +1274,23 @@ L.Control.TrackList = L.Control.extend({
             }
         },
 
+        colorInd: function(color) {
+          for (let i = 0; i < this.colors.length; i++) {
+            if (this.colors[i] === color) {
+               return i;
+            }
+          }
+          return -1;
+        },
+
         setMarkerIcon: function(marker) {
-            var symbol = 'marker',
-                colorInd = marker._parentTrack.color() + 1,
-                className = 'symbol-' + symbol + '-' + colorInd;
+            var symbol = 'marker';
+            var colorInd = 1 + this.colorInd(marker._parentTrack.color());
+            if (colorInd === 0) {
+                colorInd = 1;
+            }
+
+            var className = 'symbol-' + symbol + '-' + colorInd;
             marker.icon = iconFromBackgroundImage('track-waypoint ' + className);
         },
 
